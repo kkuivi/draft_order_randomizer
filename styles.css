@@ -347,6 +347,31 @@ button:disabled {
     transform: translateY(-1px) scale(1.02);
 }
 
+.fast-forward-button {
+    background: linear-gradient(135deg, #ffa726 0%, #ff9800 100%);
+    color: white;
+    padding: 12px 24px;
+    font-size: 16px;
+    font-weight: 600;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s;
+    box-shadow: 0 4px 15px rgba(255, 167, 38, 0.4);
+    display: block;
+    margin: 20px auto;
+    width: fit-content;
+}
+
+.fast-forward-button:hover {
+    transform: translateY(-2px) scale(1.05);
+    box-shadow: 0 6px 20px rgba(255, 167, 38, 0.6);
+}
+
+.fast-forward-button:active {
+    transform: translateY(0) scale(1);
+}
+
 .countdown-display {
     font-size: 72px;
     font-weight: 700;

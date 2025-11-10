@@ -2,6 +2,10 @@ let names = []; // Array of objects: {name: string, isLast: boolean}
 let currentDraftOrder = [];
 let isLocked = false; // Locked when loaded from share link
 
+// Animation control variables
+let countdownInterval = null;
+let animationTimeouts = [];
+
 // DOM elements
 const nameInput = document.getElementById('nameInput');
 const addButton = document.getElementById('addButton');
@@ -14,6 +18,7 @@ const resetSection = document.getElementById('resetSection');
 const resetButton = document.getElementById('resetButton');
 const revealSection = document.getElementById('revealSection');
 const revealButton = document.getElementById('revealButton');
+const fastForwardButton = document.getElementById('fastForwardButton');
 const countdownDisplay = document.getElementById('countdownDisplay');
 const draftMusic = document.getElementById('draftMusic');
 const introMusic = document.getElementById('introMusic');
@@ -42,6 +47,9 @@ resetButton.addEventListener('click', resetToCreateOwn);
 
 // Reveal button (shown when loaded from share link)
 revealButton.addEventListener('click', revealDraftOrder);
+
+// Fast forward button (skip animations)
+fastForwardButton.addEventListener('click', skipAnimations);
 
 // Load saved data on page load
 window.addEventListener('DOMContentLoaded', () => {
@@ -306,8 +314,7 @@ function displayDraftOrder(orderedNames, animated = false) {
         return;
     }
     
-    const lockNotice = isLocked ? '<div class="lock-notice">🔒 Draft order is locked (loaded from share link)</div>' : '';
-    draftOrder.innerHTML = `<h2>Draft Order</h2>${lockNotice}<ol class="order-list"></ol>`;
+    draftOrder.innerHTML = `<h2>Draft Order</h2><ol class="order-list"></ol>`;
     const orderList = draftOrder.querySelector('.order-list');
     
     if (animated) {
@@ -331,8 +338,10 @@ function displayDraftOrderAnimated(orderedNames) {
         return;
     }
     
-    const lockNotice = isLocked ? '<div class="lock-notice">🔒 Draft order is locked (loaded from share link)</div>' : '';
-    draftOrder.innerHTML = `<h2>Draft Order</h2>${lockNotice}<ol class="order-list"></ol>`;
+    // Hide fast forward button initially (will show after 3 picks are revealed)
+    fastForwardButton.style.display = 'none';
+    
+    draftOrder.innerHTML = `<h2>Draft Order</h2><ol class="order-list"></ol>`;
     const orderList = draftOrder.querySelector('.order-list');
     
     // Clear any existing items
@@ -380,13 +389,21 @@ function displayDraftOrderAnimated(orderedNames) {
     ensureMusicLoaded(() => {
         const musicDuration = getMusicDuration();
         
+        // Clear any existing timeouts
+        animationTimeouts = [];
+        
         orderedNames.forEach((name, index) => {
-            setTimeout(() => {
+            const timeout = setTimeout(() => {
             const placeholder = orderList.querySelector(`[data-index="${index}"]`);
             if (placeholder) {
                 placeholder.textContent = name;
                 placeholder.classList.remove('order-item-hidden');
                 placeholder.classList.add('order-item-reveal');
+                
+                // Show fast forward button after 3 picks have been revealed
+                if (index === 2) {
+                    fastForwardButton.style.display = 'block';
+                }
                 
                 // Play music when name is revealed
                 if (draftMusic) {
@@ -428,7 +445,7 @@ function displayDraftOrderAnimated(orderedNames) {
                 
                 // Re-enable buttons and show reset button/share button after last reveal
                 if (index === orderedNames.length - 1) {
-                    setTimeout(() => {
+                    const finalTimeout = setTimeout(() => {
                         randomizeButton.disabled = names.length < 2 || isLocked;
                         randomizeButton.textContent = 'Randomize Draft Order';
                         
@@ -439,6 +456,9 @@ function displayDraftOrderAnimated(orderedNames) {
                             nameInput.disabled = false;
                         }
                         
+                        // Hide fast forward button when animations complete
+                        fastForwardButton.style.display = 'none';
+                        
                         // Show reset button if locked (share link page)
                         if (isLocked) {
                             updateResetButtonVisibility();
@@ -447,9 +467,11 @@ function displayDraftOrderAnimated(orderedNames) {
                             addShareButtonToDraftOrder();
                         }
                     }, 500);
+                    animationTimeouts.push(finalTimeout);
                 }
             }
         }, index * musicDuration); // Delay based on music duration
+            animationTimeouts.push(timeout);
         });
     });
 }
@@ -470,6 +492,7 @@ function clearAll() {
     updateNameList();
     updateRandomizeButton();
     draftOrder.innerHTML = '';
+    fastForwardButton.style.display = 'none'; // Hide fast forward button
     // Share button will be removed when draftOrder.innerHTML is cleared
 }
 
@@ -493,6 +516,7 @@ function resetToCreateOwn() {
         showAllSections();
         revealSection.style.display = 'none';
         revealButton.style.display = 'block'; // Reset button visibility
+        fastForwardButton.style.display = 'none'; // Hide fast forward button
         countdownDisplay.style.display = 'none'; // Reset countdown visibility
         
         // Update UI
@@ -517,11 +541,71 @@ function showAllSections() {
     draftOrder.style.display = 'block';
 }
 
+// Skip animations and immediately show draft order
+function skipAnimations() {
+    // Stop all music
+    if (introMusic) {
+        introMusic.pause();
+        introMusic.currentTime = 0;
+    }
+    if (draftMusic) {
+        draftMusic.pause();
+        draftMusic.currentTime = 0;
+    }
+    
+    // Clear countdown interval
+    if (countdownInterval) {
+        clearInterval(countdownInterval);
+        countdownInterval = null;
+    }
+    
+    // Clear all animation timeouts
+    animationTimeouts.forEach(timeout => clearTimeout(timeout));
+    animationTimeouts = [];
+    
+    // Hide countdown, reveal section, and fast forward button
+    countdownDisplay.style.display = 'none';
+    revealSection.style.display = 'none';
+    fastForwardButton.style.display = 'none';
+    
+    // Show the draft order immediately
+    draftOrder.style.display = 'block';
+    
+    // Display the full draft order without animation
+    if (currentDraftOrder.length > 0 && 
+        currentDraftOrder.length === names.length &&
+        currentDraftOrder.every(name => names.some(n => n.name === name))) {
+        displayDraftOrder(currentDraftOrder, false);
+    }
+    
+    // Re-enable buttons
+    randomizeButton.disabled = names.length < 2 || isLocked;
+    randomizeButton.textContent = 'Randomize Draft Order';
+    
+    // Re-enable input and buttons (unless locked)
+    if (!isLocked) {
+        addButton.disabled = false;
+        clearButton.disabled = false;
+        nameInput.disabled = false;
+    }
+    
+    // Show reset button if locked (share link page), otherwise show share button
+    if (isLocked) {
+        updateResetButtonVisibility();
+    } else {
+        // Add share button to bottom of draft order (only if not locked)
+        addShareButtonToDraftOrder();
+    }
+}
+
 // Reveal the draft order when reveal button is clicked
 function revealDraftOrder() {
     // Hide reveal button and reset button
     revealButton.style.display = 'none';
     resetSection.style.display = 'none'; // Hide reset button until reveal completes
+    
+    // Hide fast forward button initially (will show after 3 picks are revealed)
+    fastForwardButton.style.display = 'none';
     
     // Show countdown display
     countdownDisplay.style.display = 'block';
@@ -539,12 +623,13 @@ function revealDraftOrder() {
     let countdown = 3;
     countdownDisplay.textContent = countdown;
     
-    const countdownInterval = setInterval(() => {
+    countdownInterval = setInterval(() => {
         countdown--;
         if (countdown > 0) {
             countdownDisplay.textContent = countdown;
         } else {
             clearInterval(countdownInterval);
+            countdownInterval = null;
             
             // Stop intro music
             if (introMusic) {
@@ -552,8 +637,9 @@ function revealDraftOrder() {
                 introMusic.currentTime = 0;
             }
             
-            // Hide countdown and reveal section
+            // Hide countdown and fast forward button
             countdownDisplay.style.display = 'none';
+            fastForwardButton.style.display = 'none';
             revealSection.style.display = 'none';
             
             // Show the draft order
@@ -671,6 +757,7 @@ function loadFromURL() {
                 hideAllSections();
                 revealSection.style.display = 'block';
                 revealButton.style.display = 'block'; // Ensure button is visible
+                fastForwardButton.style.display = 'none'; // Hide fast forward button initially
                 countdownDisplay.style.display = 'none'; // Ensure countdown is hidden
                 resetSection.style.display = 'none'; // Hide reset button until reveal completes
                 
