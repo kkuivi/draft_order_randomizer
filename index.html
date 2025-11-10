@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Draft Order Randomizer</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Draft Order Randomizer</h1>
+        
+        <div class="input-section">
+            <div class="input-group">
+                <input 
+                    type="text" 
+                    id="nameInput" 
+                    placeholder="Enter a name and press Enter"
+                    autocomplete="off"
+                >
+                <button id="addButton">Add Name</button>
+            </div>
+            <div id="nameList" class="name-list"></div>
+        </div>
+
+        <div class="actions">
+            <button id="randomizeButton" class="primary-button" disabled>Randomize Draft Order</button>
+            <button id="clearButton" class="secondary-button">Clear All</button>
+        </div>
+
+        <div class="share-section">
+            <div class="share-buttons">
+                <button id="shareLinkButton" class="share-button">🔗 Share draft order with friends</button>
+            </div>
+        </div>
+
+        <div id="resetSection" class="reset-section" style="display: none;">
+            <button id="resetButton" class="reset-button">🔄 Create Your Own Order</button>
+        </div>
+
+        <div id="revealSection" class="reveal-section" style="display: none;">
+            <button id="revealButton" class="reveal-button">🎯 Reveal Draft Order</button>
+            <div id="countdownDisplay" class="countdown-display" style="display: none;"></div>
+        </div>
+
+        <div id="draftOrder" class="draft-order"></div>
+    </div>
+
+    <!-- Audio element for dramatic tension music (royalty-free) -->
+    <audio id="draftMusic" preload="auto">
+        <!-- Fallback to local file (download royalty-free music and name it draft-music.mp3) -->
+        <source src="draft-music.mp3" type="audio/mpeg">
+        <source src="draft-music.ogg" type="audio/ogg">
+        Your browser does not support the audio element.
+    </audio>
+
+    <!-- Audio element for intro music (plays on share link page) -->
+    <audio id="introMusic" preload="auto" loop>
+        <source src="intro-music.mp3" type="audio/mpeg">
+        <source src="intro-music.ogg" type="audio/ogg">
+        Your browser does not support the audio element.
+    </audio>
+
+    <script src="script.js"></script>
+</body>
+</html>
+
