@@ -116,9 +116,14 @@ button:disabled {
     transition: padding 0.3s ease;
 }
 
-/* Expand padding on hover to make space for poop button */
-.name-tag-wrapper:hover .name-tag:not(.name-tag-last) {
+/* Expand padding on hover to make space for toggle buttons */
+.name-tag-wrapper:hover .name-tag:not(.name-tag-last):not(.name-tag-odds-first) {
     padding-right: 12px;
+}
+
+/* Ensure name tags with weight adjust buttons have enough space */
+.name-tag {
+    min-width: fit-content;
 }
 
 .name-tag .remove {
@@ -146,11 +151,65 @@ button:disabled {
     background: #fff3e0;
 }
 
+.name-tag-odds-first {
+    border: 2px solid #ffd700;
+    background: #fffef0;
+}
+
+.weight-container {
+    margin-top: 4px;
+    font-size: 11px;
+    color: #666;
+    text-align: center;
+}
+
+.weight-label {
+    cursor: pointer;
+    user-select: none;
+    padding: 2px 4px;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.weight-label:hover {
+    background-color: #f0f0f0;
+}
+
+.weight-input {
+    width: 50px;
+    padding: 2px 4px;
+    border: 1px solid #667eea;
+    border-radius: 4px;
+    font-size: 11px;
+    text-align: center;
+}
+
+.weight-input:focus {
+    outline: none;
+    border-color: #5568d3;
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+}
+
+.name-tag-labels {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: 2px;
+}
+
 .last-pick-label {
     font-size: 10px;
     color: #ffa726;
     text-align: center;
-    margin-top: 2px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.odds-first-label {
+    font-size: 10px;
+    color: #ffa500;
+    text-align: center;
     font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -202,6 +261,101 @@ button:disabled {
 }
 
 .last-toggle:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.odds-toggle {
+    background: #ffd700;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    flex-shrink: 0;
+}
+
+/* Hide toggle button by default, show on hover */
+.odds-toggle-hover {
+    opacity: 0;
+    width: 0;
+    padding: 0;
+    margin: 0;
+    pointer-events: none;
+    overflow: hidden;
+}
+
+.name-tag-wrapper:hover .name-tag .odds-toggle-hover {
+    opacity: 1;
+    width: 24px;
+    margin-left: 4px;
+    pointer-events: auto;
+}
+
+/* Always show button for names with odds for first */
+.odds-toggle-remove {
+    opacity: 1;
+    margin-left: 4px;
+}
+
+.odds-toggle:hover:not(:disabled) {
+    background: #ffc107;
+    transform: scale(1.1);
+}
+
+.odds-toggle:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.weight-adjust-buttons {
+    display: none; /* Hidden by default */
+    gap: 2px;
+    margin-left: 4px;
+    align-items: center;
+}
+
+/* Show weight adjust buttons on hover for regular name tags */
+.name-tag-wrapper:hover .name-tag:not(.name-tag-last):not(.name-tag-odds-first) .weight-adjust-buttons {
+    display: flex;
+}
+
+.weight-adjust-btn {
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    line-height: 1;
+}
+
+.weight-adjust-btn:hover:not(:disabled) {
+    background: #5568d3;
+    transform: scale(1.1);
+}
+
+.weight-adjust-btn:active:not(:disabled) {
+    transform: scale(0.95);
+}
+
+.weight-adjust-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
 }

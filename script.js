@@ -84,7 +84,8 @@ function addName() {
         return;
     }
     
-    names.push({ name: name, isLast: false });
+    // Default weights: odds for first = 10, regular = 5, last pick = 1
+    names.push({ name: name, isLast: false, hasOddsForFirst: false, weight: 5 });
     nameInput.value = '';
     updateNameList();
     updateRandomizeButton();
@@ -104,6 +105,17 @@ function removeName(nameObjToRemove) {
     draftOrder.innerHTML = '';
 }
 
+// Get default weight based on flags
+function getDefaultWeight(nameObj) {
+    if (nameObj.hasOddsForFirst) {
+        return 10; // Highest weight for odds for first
+    } else if (nameObj.isLast) {
+        return 1; // Lowest weight for last pick
+    } else {
+        return 5; // Default weight for regular names
+    }
+}
+
 function toggleLastPick(nameObj) {
     if (isLocked) {
         return;
@@ -115,14 +127,80 @@ function toggleLastPick(nameObj) {
         names.forEach(n => {
             if (n !== nameObj && n.isLast) {
                 n.isLast = false;
+                n.weight = getDefaultWeight(n); // Update weight
             }
         });
     }
     
     // Toggle the current name's last pick status
     nameObj.isLast = !nameObj.isLast;
+    // Update weight based on new status (unless user has set custom weight)
+    if (!nameObj.hasCustomWeight) {
+        nameObj.weight = getDefaultWeight(nameObj);
+    }
     updateNameList();
     // Clear draft order if last pick status changes
+    currentDraftOrder = [];
+    draftOrder.innerHTML = '';
+}
+
+function toggleOddsForFirst(nameObj) {
+    if (isLocked) {
+        return;
+    }
+    
+    // Toggle the current name's odds for first status
+    nameObj.hasOddsForFirst = !nameObj.hasOddsForFirst;
+    // Update weight based on new status (unless user has set custom weight)
+    if (!nameObj.hasCustomWeight) {
+        nameObj.weight = getDefaultWeight(nameObj);
+    }
+    updateNameList();
+    // Clear draft order if odds for first status changes
+    currentDraftOrder = [];
+    draftOrder.innerHTML = '';
+}
+
+function updateWeight(nameObj, newWeight) {
+    if (isLocked) {
+        return;
+    }
+    
+    const weight = Math.max(1, Math.min(100, parseInt(newWeight) || 5)); // Clamp between 1 and 100
+    nameObj.weight = weight;
+    nameObj.hasCustomWeight = true;
+    updateNameList();
+    // Clear draft order if weight changes
+    currentDraftOrder = [];
+    draftOrder.innerHTML = '';
+}
+
+function adjustWeight(nameObj, delta) {
+    if (isLocked) {
+        return;
+    }
+    
+    // Get min and max bounds based on name type
+    let minWeight = 1;
+    let maxWeight = 100;
+    
+    if (nameObj.isLast) {
+        // Last pick: weight should be less than regular names (max 4, since regular default is 5)
+        maxWeight = 4;
+    } else if (nameObj.hasOddsForFirst) {
+        // Odds for first: weight should be higher than regular names (min 6, since regular default is 5)
+        minWeight = 6;
+    } else {
+        // Regular name: weight should be between last pick (1) and odds for first (10)
+        minWeight = 2; // Above last pick
+        maxWeight = 9; // Below odds for first
+    }
+    
+    const newWeight = Math.max(minWeight, Math.min(maxWeight, nameObj.weight + delta));
+    nameObj.weight = newWeight;
+    nameObj.hasCustomWeight = true;
+    updateNameList();
+    // Clear draft order if weight changes
     currentDraftOrder = [];
     draftOrder.innerHTML = '';
 }
@@ -154,9 +232,17 @@ function updateNameList() {
     }
     
     names.forEach(nameObj => {
-        // Ensure isLast is always a boolean
+        // Ensure isLast and hasOddsForFirst are always booleans
         if (typeof nameObj.isLast !== 'boolean') {
             nameObj.isLast = false;
+        }
+        if (typeof nameObj.hasOddsForFirst !== 'boolean') {
+            nameObj.hasOddsForFirst = false;
+        }
+        // Ensure weight exists and is a number
+        if (typeof nameObj.weight !== 'number' || isNaN(nameObj.weight)) {
+            nameObj.weight = getDefaultWeight(nameObj);
+            nameObj.hasCustomWeight = false;
         }
         
         // Create wrapper for name tag and hover button
@@ -170,6 +256,9 @@ function updateNameList() {
         tag.className = 'name-tag';
         if (nameObj.isLast) {
             tag.classList.add('name-tag-last');
+        }
+        if (nameObj.hasOddsForFirst) {
+            tag.classList.add('name-tag-odds-first');
         }
         
         const span = document.createElement('span');
@@ -208,18 +297,132 @@ function updateNameList() {
             lastBtn.addEventListener('click', () => toggleLastPick(nameObj));
         }
         
+        // Toggle odds for first button (shown inline in pill on hover, or always visible if already marked)
+        const oddsBtn = document.createElement('button');
+        oddsBtn.className = 'odds-toggle';
+        if (nameObj.hasOddsForFirst) {
+            oddsBtn.textContent = '⭐';
+            oddsBtn.title = 'Remove odds for first';
+            oddsBtn.setAttribute('aria-label', 'Remove odds for first');
+            oddsBtn.classList.add('odds-toggle-remove');
+        } else {
+            oddsBtn.textContent = '⭐';
+            oddsBtn.title = 'Mark as odds for first';
+            oddsBtn.setAttribute('aria-label', 'Mark as odds for first');
+            oddsBtn.classList.add('odds-toggle-hover'); // Hidden by default, shown on hover
+        }
+        if (isLocked) {
+            oddsBtn.disabled = true;
+            oddsBtn.style.opacity = '0.5';
+            oddsBtn.style.cursor = 'not-allowed';
+        } else {
+            oddsBtn.addEventListener('click', () => toggleOddsForFirst(nameObj));
+        }
+        
+        // Add +/- buttons for regular names (not odds for first, not last pick)
+        let weightAdjustButtons = null;
+        if (!nameObj.isLast && !nameObj.hasOddsForFirst && !isLocked) {
+            weightAdjustButtons = document.createElement('div');
+            weightAdjustButtons.className = 'weight-adjust-buttons';
+            
+            const decreaseBtn = document.createElement('button');
+            decreaseBtn.className = 'weight-adjust-btn weight-decrease-btn';
+            decreaseBtn.textContent = '−';
+            decreaseBtn.title = 'Decrease weight';
+            decreaseBtn.setAttribute('aria-label', 'Decrease weight');
+            decreaseBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                adjustWeight(nameObj, -1);
+            });
+            
+            const increaseBtn = document.createElement('button');
+            increaseBtn.className = 'weight-adjust-btn weight-increase-btn';
+            increaseBtn.textContent = '+';
+            increaseBtn.title = 'Increase weight';
+            increaseBtn.setAttribute('aria-label', 'Increase weight');
+            increaseBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                adjustWeight(nameObj, 1);
+            });
+            
+            weightAdjustButtons.appendChild(decreaseBtn);
+            weightAdjustButtons.appendChild(increaseBtn);
+        }
+        
         tag.appendChild(span);
+        if (weightAdjustButtons) {
+            tag.appendChild(weightAdjustButtons);
+        }
+        tag.appendChild(oddsBtn);
         tag.appendChild(lastBtn);
         tag.appendChild(removeBtn);
         
         wrapper.appendChild(tag);
         
-        // Add "last pick" text below the tag if marked as last pick
+        // Add weight display/input
+        const weightContainer = document.createElement('div');
+        weightContainer.className = 'weight-container';
+        
+        const weightLabel = document.createElement('span');
+        weightLabel.className = 'weight-label';
+        weightLabel.textContent = `Weight: ${nameObj.weight}`;
+        weightLabel.title = 'Click to edit weight';
+        
+        const weightInput = document.createElement('input');
+        weightInput.type = 'number';
+        weightInput.className = 'weight-input';
+        weightInput.value = nameObj.weight;
+        weightInput.min = '1';
+        weightInput.max = '100';
+        weightInput.style.display = 'none';
+        
+        if (isLocked) {
+            weightLabel.style.opacity = '0.5';
+            weightLabel.style.cursor = 'not-allowed';
+        } else {
+            weightLabel.style.cursor = 'pointer';
+            weightLabel.addEventListener('click', () => {
+                weightLabel.style.display = 'none';
+                weightInput.style.display = 'inline-block';
+                weightInput.focus();
+                weightInput.select();
+            });
+            
+            weightInput.addEventListener('blur', () => {
+                updateWeight(nameObj, weightInput.value);
+            });
+            
+            weightInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    weightInput.blur();
+                }
+            });
+        }
+        
+        weightContainer.appendChild(weightLabel);
+        weightContainer.appendChild(weightInput);
+        wrapper.appendChild(weightContainer);
+        
+        // Add labels below the tag
+        const labelsContainer = document.createElement('div');
+        labelsContainer.className = 'name-tag-labels';
+        
+        if (nameObj.hasOddsForFirst) {
+            const oddsLabel = document.createElement('div');
+            oddsLabel.className = 'odds-first-label';
+            oddsLabel.textContent = 'odds for first';
+            labelsContainer.appendChild(oddsLabel);
+        }
+        
         if (nameObj.isLast) {
             const lastPickLabel = document.createElement('div');
             lastPickLabel.className = 'last-pick-label';
             lastPickLabel.textContent = 'last pick';
-            wrapper.appendChild(lastPickLabel);
+            labelsContainer.appendChild(lastPickLabel);
+        }
+        
+        if (labelsContainer.children.length > 0) {
+            wrapper.appendChild(labelsContainer);
         }
         
         nameList.appendChild(wrapper);
@@ -285,24 +488,160 @@ function randomizeOrder() {
     clearButton.disabled = true;
     nameInput.disabled = true;
     
-    // Separate names into regular and last picks
-    const regularNames = names.filter(n => !n.isLast).map(n => n.name);
-    const lastPicks = names.filter(n => n.isLast).map(n => n.name);
+    // Separate names into odds for first, regular, and last picks (keep full objects for weights)
+    const oddsForFirst = names.filter(n => !n.isLast && n.hasOddsForFirst);
+    const regularNames = names.filter(n => !n.isLast && !n.hasOddsForFirst);
+    const lastPicks = names.filter(n => n.isLast);
     
-    // Fisher-Yates shuffle algorithm for regular names
-    for (let i = regularNames.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [regularNames[i], regularNames[j]] = [regularNames[j], regularNames[i]];
+    // Weighted random selection function
+    function weightedRandomSelect(nameArray) {
+        if (nameArray.length === 0) return null;
+        if (nameArray.length === 1) return nameArray[0];
+        
+        // Calculate total weight
+        const totalWeight = nameArray.reduce((sum, n) => sum + n.weight, 0);
+        
+        // Generate random number between 0 and totalWeight
+        let random = Math.random() * totalWeight;
+        
+        // Find which name this random number corresponds to
+        for (let i = 0; i < nameArray.length; i++) {
+            random -= nameArray[i].weight;
+            if (random <= 0) {
+                return nameArray[i];
+            }
+        }
+        
+        // Fallback (shouldn't happen)
+        return nameArray[nameArray.length - 1];
     }
     
-    // Shuffle last picks as well (in case multiple are marked as last)
-    for (let i = lastPicks.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [lastPicks[i], lastPicks[j]] = [lastPicks[j], lastPicks[i]];
+    // Select first pick: weighted random selection from names with odds for first (if any)
+    let firstPick = null;
+    
+    if (oddsForFirst.length > 0) {
+        // Weighted random selection from odds for first
+        firstPick = weightedRandomSelect(oddsForFirst);
+    } else {
+        // No names with odds for first, so weighted random selection from regular names
+        if (regularNames.length > 0) {
+            firstPick = weightedRandomSelect(regularNames);
+        } else {
+            // Only last picks available (shouldn't happen, but handle it)
+            firstPick = weightedRandomSelect(lastPicks);
+        }
     }
     
-    // Combine: regular names first, then last picks at the end
-    const shuffled = [...regularNames, ...lastPicks];
+    // Get remaining names after first pick is selected
+    const remainingOddsForFirstAfterFirst = oddsForFirst.filter(n => n !== firstPick);
+    const remainingRegularAfterFirst = regularNames.filter(n => n !== firstPick);
+    const remainingLastAfterFirst = lastPicks.filter(n => n !== firstPick);
+    
+    // Sort remaining odds for first names by weight (descending), then shuffle names with same weight
+    const shuffledOddsForFirst = [];
+    const remainingOdds = [...remainingOddsForFirstAfterFirst];
+    // Sort by weight descending
+    remainingOdds.sort((a, b) => b.weight - a.weight);
+    
+    // Group by weight and shuffle within each weight group
+    let currentWeight = null;
+    let currentGroup = [];
+    for (const nameObj of remainingOdds) {
+        if (currentWeight === null || nameObj.weight === currentWeight) {
+            currentWeight = nameObj.weight;
+            currentGroup.push(nameObj);
+        } else {
+            // Shuffle current group and add to result
+            for (let i = currentGroup.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [currentGroup[i], currentGroup[j]] = [currentGroup[j], currentGroup[i]];
+            }
+            shuffledOddsForFirst.push(...currentGroup.map(n => n.name));
+            // Start new group
+            currentWeight = nameObj.weight;
+            currentGroup = [nameObj];
+        }
+    }
+    // Handle last group
+    if (currentGroup.length > 0) {
+        for (let i = currentGroup.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [currentGroup[i], currentGroup[j]] = [currentGroup[j], currentGroup[i]];
+        }
+        shuffledOddsForFirst.push(...currentGroup.map(n => n.name));
+    }
+    
+    // Sort regular names by weight (descending), then shuffle names with same weight
+    const shuffledRegular = [];
+    const remainingRegular = [...remainingRegularAfterFirst];
+    // Sort by weight descending
+    remainingRegular.sort((a, b) => b.weight - a.weight);
+    
+    // Group by weight and shuffle within each weight group
+    currentWeight = null;
+    currentGroup = [];
+    for (const nameObj of remainingRegular) {
+        if (currentWeight === null || nameObj.weight === currentWeight) {
+            currentWeight = nameObj.weight;
+            currentGroup.push(nameObj);
+        } else {
+            // Shuffle current group and add to result
+            for (let i = currentGroup.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [currentGroup[i], currentGroup[j]] = [currentGroup[j], currentGroup[i]];
+            }
+            shuffledRegular.push(...currentGroup.map(n => n.name));
+            // Start new group
+            currentWeight = nameObj.weight;
+            currentGroup = [nameObj];
+        }
+    }
+    // Handle last group
+    if (currentGroup.length > 0) {
+        for (let i = currentGroup.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [currentGroup[i], currentGroup[j]] = [currentGroup[j], currentGroup[i]];
+        }
+        shuffledRegular.push(...currentGroup.map(n => n.name));
+    }
+    
+    // Sort last picks by weight (descending), then shuffle names with same weight
+    const shuffledLastPicks = [];
+    const remainingLast = [...remainingLastAfterFirst];
+    // Sort by weight descending
+    remainingLast.sort((a, b) => b.weight - a.weight);
+    
+    // Group by weight and shuffle within each weight group
+    currentWeight = null;
+    currentGroup = [];
+    for (const nameObj of remainingLast) {
+        if (currentWeight === null || nameObj.weight === currentWeight) {
+            currentWeight = nameObj.weight;
+            currentGroup.push(nameObj);
+        } else {
+            // Shuffle current group and add to result
+            for (let i = currentGroup.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [currentGroup[i], currentGroup[j]] = [currentGroup[j], currentGroup[i]];
+            }
+            shuffledLastPicks.push(...currentGroup.map(n => n.name));
+            // Start new group
+            currentWeight = nameObj.weight;
+            currentGroup = [nameObj];
+        }
+    }
+    // Handle last group
+    if (currentGroup.length > 0) {
+        for (let i = currentGroup.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [currentGroup[i], currentGroup[j]] = [currentGroup[j], currentGroup[i]];
+        }
+        shuffledLastPicks.push(...currentGroup.map(n => n.name));
+    }
+    
+    // Combine: first pick, then remaining odds for first (weighted shuffled), then regular names (weighted shuffled), then last picks
+    // This ensures all odds for first names come before regular names
+    const shuffled = [firstPick.name, ...shuffledOddsForFirst, ...shuffledRegular, ...shuffledLastPicks];
     
     currentDraftOrder = shuffled;
     displayDraftOrderAnimated(shuffled);
@@ -739,14 +1078,23 @@ function loadFromURL() {
                 // Convert names to object format if needed (for backward compatibility)
                 names = data.names.map(name => {
                     if (typeof name === 'string') {
-                        return { name: name, isLast: false };
+                        return { name: name, isLast: false, hasOddsForFirst: false, weight: 5, hasCustomWeight: false };
                     }
-                    // Already an object, ensure it has isLast property
+                    // Already an object, ensure it has isLast, hasOddsForFirst, and weight properties
                     // Explicitly check if isLast exists and is true, otherwise default to false
                     const isLast = (name && typeof name === 'object' && name.hasOwnProperty('isLast')) 
                         ? Boolean(name.isLast) 
                         : false;
-                    return { name: name.name || name, isLast: isLast };
+                    const hasOddsForFirst = (name && typeof name === 'object' && name.hasOwnProperty('hasOddsForFirst')) 
+                        ? Boolean(name.hasOddsForFirst) 
+                        : false;
+                    const weight = (name && typeof name === 'object' && typeof name.weight === 'number') 
+                        ? name.weight 
+                        : (hasOddsForFirst ? 10 : (isLast ? 1 : 5));
+                    const hasCustomWeight = (name && typeof name === 'object' && name.hasOwnProperty('hasCustomWeight')) 
+                        ? Boolean(name.hasCustomWeight) 
+                        : false;
+                    return { name: name.name || name, isLast: isLast, hasOddsForFirst: hasOddsForFirst, weight: weight, hasCustomWeight: hasCustomWeight };
                 });
                 currentDraftOrder = data.draftOrder || [];
                 
